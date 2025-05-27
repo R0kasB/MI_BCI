@@ -2,7 +2,7 @@
 
 **Undergraduate Neurobiophysics Thesis**  
 **Vilnius University Life Sciences Center**  
-**Program**: Neurobiophysics study program  
+**BSc program**: Neurobiophysics  
 **Author / Autorius**: Rokas Bertašius  
 **Supervisor / Darbo vadovas**: Dr. Aleksandras Voicikas  
 
