@@ -92,6 +92,9 @@ cd /path/to/MI_BCI
 
 # 3. Install all dependencies from pixi.toml
 pixi install
+
+# 4. Activate the virtual environment
+pixi shell
 ```
 ---
 
