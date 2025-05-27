@@ -1,0 +1,345 @@
+
+import sys
+sys.path.append('c:\\Users\\rokas\\Documents\\Github\\BCI\\mi-bci\\code')
+
+import numpy as np
+import mne
+import os
+from autoreject import AutoReject
+from pyprep.prep_pipeline import PrepPipeline
+import matplotlib.pyplot as plt
+from helper_functions import setup_logger
+import shutil
+from helper_functions.data_procesing.mi_procesing import process_mi_epochs,process_mi_raw
+
+import os
+import shutil
+import logging
+
+import numpy as np
+import mne
+import spkit as sp
+from sklearn.model_selection import ParameterGrid
+from joblib import Parallel, delayed
+
+log = setup_logger("data_preproces")
+
+def preprocess_raw_pyprep(raw, plot=False, include_raw=False):
+    '''returns cleaned raw data(uncleaned raw optional)'''
+
+    # Step 5: Set Up PREP Pipeline Parameters
+    prep_params = {
+        "ref_chs": "eeg",  # Use all EEG channels for referencing
+        "reref_chs": "eeg",  # Channels to be re-referenced
+        "line_freqs": np.arange(50, raw.info['sfreq'] / 2, 50)  # Line noise frequencies (e.g., 50 Hz for Europe)
+    }
+
+    # Step 6: Prepare a Copy of the Raw Data
+    raw_copy = raw.copy()  # It's a good practice to avoid modifying the original data
+
+    # Step 6a: Check and Set Montage
+    montage = raw.get_montage()  # Get the montage from the original data
+    if montage is None:
+        log.error("No montage found. Please set a montage before running the pipeline.")
+        return
+
+    # Step 7: Initialize the PREP Pipeline
+    prep = PrepPipeline(raw_copy, prep_params, montage)
+
+    # Step 8: Run the PREP Pipeline
+    prep.fit()  # This will perform re-referencing, line noise removal, and bad channel interpolation
+
+    # Step 9: Check the Results of the PREP Pipeline
+    log.info(f"Interpolated channels: {prep.interpolated_channels}")
+    log.info(f"Original noisy channels: {prep.noisy_channels_original['bad_all']}")
+    log.info(f"Remaining noisy channels after interpolation: {prep.still_noisy_channels}")
+
+    cleaned_raw = prep.raw
+    
+    if plot:
+        '''
+        raw.plot(scalings='auto', title='Original Raw Data', show=True)
+        cleaned_raw.plot(scalings='auto', title='Cleaned Raw Data', show=True)
+        raw.plot_psd(fmax=50, title='Original Raw Data psd', show=True)
+        cleaned_raw.plot_psd(fmax=50,title='Cleaned Raw Data psd', show=True)
+        plt.show()
+        '''
+        # Extract data and times for plotting
+        raw_data, raw_times = raw.get_data(), raw.times
+        cleaned_data, cleaned_times = cleaned_raw.get_data(), cleaned_raw.times
+
+        # Create a figure with subplots
+        fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+
+        # Plot the original raw data (first 10 channels)
+        axs[0, 0].plot(raw_times, raw_data[:10].T)
+        axs[0, 0].set_title('Original Raw Data')
+        axs[0, 0].set_xlabel('Time (s)')
+        axs[0, 0].set_ylabel('Amplitude (µV)')
+
+        # Plot the cleaned raw data (first 10 channels)
+        axs[0, 1].plot(cleaned_times, cleaned_data[:10].T)
+        axs[0, 1].set_title('Cleaned Raw Data')
+        axs[0, 1].set_xlabel('Time (s)')
+        axs[0, 1].set_ylabel('Amplitude (µV)')
+
+        # Plot the Power Spectral Density (PSD) of the original raw data
+        raw.plot_psd(fmax=50, ax=axs[1, 0], show=False)
+        axs[1, 0].set_title('Original Raw Data PSD')
+
+        # Plot the Power Spectral Density (PSD) of the cleaned raw data
+        cleaned_raw.plot_psd(fmax=50, ax=axs[1, 1], show=False)
+        axs[1, 1].set_title('Cleaned Raw Data PSD')
+
+        # Add titles and adjust layout
+        fig.suptitle('Comparison of Original and Cleaned EEG Data', fontsize=16)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Adjust layout to accommodate the main title
+        plt.show()
+    if include_raw:
+        return [cleaned_raw, raw]
+    return cleaned_raw
+
+def preprocess_raw_autoreject(raw, event_id, preloaded=True, 
+                              tmin=None,tmax=None, include_raw=False, save=False, extra_mark='',
+                              dataset_no=None,paradigm=None, subject=None,run=None,filter_data=False):
+    ''''returns cleaned and epoched raw data(uncleaned epochs optional)'''
+    
+    if tmin is None or tmax is None:        
+        log.error("tmin and tmax were not defined")
+    elif tmin == None:
+        log.error("tmin was not defined")
+    elif tmax == None:
+        log.error("tmax was not defined")    
+    
+    events_raw = mne.find_events(raw)
+
+    if filter_data:
+        epochs_raw = mne.Epochs(raw, events_raw, event_id=event_id, tmin=tmin-1, tmax=tmax+1)
+    else:
+        epochs_raw = mne.Epochs(raw, events_raw, event_id=event_id, tmin=tmin, tmax=tmax)
+    
+    if not preloaded:
+        temp_dir = os.path.join(os.getcwd(), 'data' ,'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        epochs_raw.save(os.path.join(temp_dir, 'epochs_raw-epo.fif'), overwrite=True)        
+        epochs_raw = mne.read_epochs(os.path.join(temp_dir, 'epochs_raw-epo.fif'), preload=True)
+        
+        #  Delete Temporary Directory
+        shutil.rmtree(temp_dir)  
+        
+    ar = AutoReject(n_jobs=-1)
+    epochs_raw_autoreject = ar.fit_transform(epochs_raw.copy())
+    if filter_data:
+        epochs_raw_autoreject = process_mi_epochs(epochs_raw_autoreject)
+        epochs_raw_autoreject.crop(tmin=tmin, tmax=tmax)
+    if save:
+        root_path = os.path.join(os.getcwd(),'data','procesed',str(dataset_no), paradigm,extra_mark,str(subject),str(run))
+        os.makedirs(root_path, exist_ok=True)
+        epochs_raw_autoreject.save(os.path.join(root_path, 's{:02}.{:02}_epochs_raw_autoreject-epo.fif'.format(subject, run)), overwrite=True)
+        log.info("s{:02}.{:02}_epochs_raw_autoreject-epo.fif SAVED".format(subject, run))
+    
+    if include_raw:
+        return [epochs_raw, epochs_raw_autoreject]
+    return epochs_raw_autoreject
+
+def preprocess_raw(raw, event_id,tmin=None,tmax=None,
+                   save = False, dataset_no = None, paradigm = None, 
+                   subject = None, run = None, n_jobs=-1):
+    if save:
+        root_path = os.path.join(os.getcwd(),'data','procesed',str(dataset_no), paradigm,str(subject),str(run))
+        os.makedirs(root_path, exist_ok=True)
+
+    #     event_id = {'left_hand': 1, 'right_hand': 2, 'passive_state': 3}
+    if tmin and tmax == None:
+        log.error("tmin and tmax were not defined")
+    elif tmin == None:
+        log.error("tmin was not defined")
+    elif tmax == None:
+        log.error("tmax was not defined")
+        
+    raw_cleaned = preprocess_raw_pyprep(raw, plot=False)
+    if save:
+        raw_cleaned.save(os.path.join(root_path, 's{:02}.{:02}_raw_cleaned-raw.fif'.format(subject, run)), overwrite=True)
+        log.info('s{:02}.{:02}_raw_cleaned-raw.fif SAVED'.format(subject, run))
+
+
+    events_raw = mne.find_events(raw) # Find events (triggers) in the data
+    events_raw_cleaned = mne.find_events(raw_cleaned) # Find events (triggers) in the cleaned data
+
+    epochs_raw_save = mne.Epochs(raw, events_raw, event_id=event_id, tmin=tmin, tmax=tmax)
+    epochs_raw_cleaned_save = mne.Epochs(raw_cleaned, events_raw_cleaned, event_id=event_id, tmin=tmin, tmax=tmax)
+    
+    if save:
+        epochs_raw_save.save(os.path.join(root_path, 's{:02}.{:02}_epochs_raw-epo.fif'.format(subject, run)), overwrite=True)
+        log.info("s{:02}.{:02}_epochs_raw-epo.fif SAVED".format(subject, run))
+        epochs_raw = mne.read_epochs(os.path.join(root_path, 's{:02}.{:02}_epochs_raw-epo.fif'.format(subject, run)), preload=True)
+
+        epochs_raw_cleaned_save.save(os.path.join(root_path, 's{:02}.{:02}_epochs_raw_cleaned-epo.fif'.format(subject, run)), overwrite=True)
+        log.info("raw_cleaned for {subject}-{run} SAVED".format(subject=subject, run=run))
+        epochs_raw_cleaned = mne.read_epochs(os.path.join(root_path, 's{:02}.{:02}_epochs_raw_cleaned-epo.fif'.format(subject, run)), preload=True)
+
+        
+    else:
+        temp_dir = os.path.join(os.getcwd(), 'data' ,'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        epochs_raw.save(os.path.join(temp_dir, 'epochs_raw-epo.fif'), overwrite=True)
+        epochs_raw_cleaned.save(os.path.join(temp_dir, 'epochs_raw_cleaned-epo.fif'), overwrite=True)
+        
+        epochs_raw = mne.read_epochs(os.path.join(temp_dir, 'epochs_raw-epo.fif'), preload=True)
+        epochs_raw_cleaned = mne.read_epochs(os.path.join(temp_dir, 'epochs_raw_cleaned-epo.fif'), preload=True)
+
+        #  Delete Temporary Directory
+        shutil.rmtree(temp_dir)  
+        
+    ar = AutoReject(n_jobs=n_jobs)
+    epochs_raw_autoreject = ar.fit_transform(epochs_raw)
+    epochs_raw_cleaned_autoreject = ar.fit_transform(epochs_raw_cleaned)
+    
+    if save:
+        epochs_raw_autoreject.save(os.path.join(root_path, 's{:02}.{:02}_epochs_raw_autoreject-epo.fif'.format(subject, run)), overwrite=True)
+        log.info("s{:02}.{:02}_epochs_raw_autoreject-epo.fif SAVED".format(subject, run))
+
+        epochs_raw_cleaned_autoreject.save(os.path.join(root_path, 's{:02}.{:02}_epochs_raw_cleaned_autoreject-epo.fif'.format(subject, run)), overwrite=True)
+        log.info("s{:02}.{:02}_epochs_raw_cleaned_autoreject-epo.fif SAVED".format(subject, run))
+
+       
+    return [epochs_raw, epochs_raw_cleaned, epochs_raw_autoreject, epochs_raw_cleaned_autoreject, raw_cleaned, raw]
+
+def preprocess_raw_atar(raw=None, epochs=None, event_id=None,
+                        tmin=None, tmax=None,
+                        preloaded=True,
+                        include_raw=False,
+                        save=False,
+                        extra_mark='',
+                        dataset_no=None,
+                        paradigm=None,
+                        subject=None,
+                        run=None,
+                        filter_data=False,
+                        # ATAR minimal params:
+                        beta=0.1,
+                        OptMode='soft',
+                        optimize=False, log=None):
+    """
+    Epoch + clean via ATAR (Automatic & Tunable Artifact Removal).
+
+    You may pass either a Raw (`raw`) and `event_id` with `tmin`/`tmax`,
+    or pre-constructed `epochs`.  If `optimize=True`, saves a cleaned file
+    for each (`beta`,`OptMode`) without scoring.
+    """
+    if log is None:
+        log = logging.getLogger(__name__)
+
+    # 1) obtain epochs
+    if epochs is None:
+        if raw is None or event_id is None or tmin is None or tmax is None:
+            raise ValueError(
+                "Must provide either `epochs` or (`raw`, `event_id`, `tmin`, `tmax`)."
+            )
+        if filter_data:
+            raw = process_mi_raw(raw)
+        events, _ = mne.events_from_annotations(raw)
+        epochs_raw = mne.Epochs(
+            raw, events, event_id,
+            tmin, tmax,
+            preload=preloaded,
+            baseline=None,
+            verbose=False
+        )
+        if not preloaded:
+            temp_dir = os.path.join(os.getcwd(), 'data', 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            epochs_raw.save(
+                os.path.join(temp_dir, 'tmp-epo.fif'),
+                overwrite=True
+            )
+            epochs_raw = mne.read_epochs(
+                os.path.join(temp_dir, 'tmp-epo.fif'),
+                preload=True, verbose=False
+            )
+            shutil.rmtree(temp_dir)
+        epochs = epochs_raw.copy()
+    else:
+        if not hasattr(epochs, 'get_data'):
+            raise ValueError("`epochs` must be an MNE Epochs object.")
+        epochs_raw = None
+
+    # MI-specific post-epoch processing
+    epochs = process_mi_epochs(epochs)
+
+    sfreq = epochs.info['sfreq']
+    data = epochs.get_data()
+
+    # prepare save directory
+    if save:
+        if None in (dataset_no, paradigm, subject, run):
+            raise ValueError(
+                "To save, provide `dataset_no`, `paradigm`, `subject`, and `run`."
+            )
+        save_root = os.path.join(
+            os.getcwd(), 'data', 'procesed',
+            str(dataset_no), paradigm, extra_mark,
+            f"{subject}", f"{run}"
+        )
+        os.makedirs(save_root, exist_ok=True)
+
+    def run_atar(beta_val, mode_val):
+        def process_epoch(epoch):
+            X = epoch.T
+            Xr = sp.eeg.ATAR(
+                X, fs=sfreq,
+                beta=beta_val,
+                OptMode=mode_val,
+                k1=10.0e-6,
+                k2=100.0e-6
+            )
+            return Xr.T
+
+        cleaned_tmp = Parallel(n_jobs=-1, backend="loky")(
+            delayed(process_epoch)(epoch) for epoch in data
+        )
+
+        return np.array(cleaned_tmp)
+
+    # 5) optimization or single-run
+    if optimize:
+        grid = {
+            'beta': [0.01, 0.05, 0.1, 0.2, 0.5],
+            'OptMode': ['soft', 'linAtten', 'elim']
+        }
+        for params in ParameterGrid(grid):
+            cleaned_temp = run_atar(params['beta'], params['OptMode'])
+            if save:
+                temp_epochs = epochs.copy()
+                temp_epochs._data = cleaned_temp
+                fname = os.path.join(
+                    save_root,
+                    f"s{subject:02d}.{run:02d}_beta{params['beta']}_OptMode{params['OptMode']}-epo.fif"
+                )
+                temp_epochs.save(fname, overwrite=True)
+                log.info(f"Saved ATAR epochs: {fname}")
+        cleaned = cleaned_temp
+    else:
+        cleaned = run_atar(beta, OptMode)
+        
+        if save:
+            temp_epochs = epochs.copy()
+            temp_epochs._data = cleaned
+            fname = os.path.join(
+                save_root,
+                f"s{subject:02d}.{run:02d}_beta{beta}_OptMode{OptMode}.fif"
+            )
+            temp_epochs.save(fname, overwrite=True)
+            log.info(f"Saved ATAR epochs: {fname}")
+
+
+    # assemble cleaned epochs
+    epochs_atar = epochs.copy()
+    epochs_atar._data = cleaned
+
+    # return as dict
+    result = {'epochs_atar': epochs_atar}
+    if include_raw:
+        result['epochs_raw'] = epochs_raw
+
+    return result
