@@ -139,12 +139,9 @@ List of data files in the dataset grouped by recording session participant.
         data_for_raw = np.vstack([data.data.T, data.marker])
         raw = RawArray(data=data_for_raw, info=info, verbose=True)
         
-        # raw.drop_channels('X5') #idk ka daryt su tuo kanalu
-        # Check if 'X3' is present in the data channels and drop it if so
         if 'X3' in raw.info['ch_names']:
             raw.drop_channels(['X3'])
 
-        # Check if 'X5' is present in the data channels and drop it if so
         if 'X5' in raw.info['ch_names']:
             raw.drop_channels(['X5'])
             
@@ -157,16 +154,11 @@ List of data files in the dataset grouped by recording session participant.
         onsets = events[:, 0] / sfreq  # Onsets in seconds
         descriptions = [self.event_desc[e] for e in events[:, 2]]
 
-        # Calculate offsets (next onset or end of recording)
-        # durations = np.diff(np.append(onsets, raw.times[-1]))
-
-        # Create annotations with the correct duration
         annotations = mne.Annotations(onset=onsets, duration=[1] * len(onsets), description=descriptions)
         
         raw.set_annotations(annotations)        
         return raw
     
-    # Base URL of the Figshare API for the collection
     collection_url = 'https://api.figshare.com/v2/collections/3917698/articles'
 
     # Function to get all dataset URLs from the collection page using Figshare API with pagination
@@ -198,13 +190,10 @@ List of data files in the dataset grouped by recording session participant.
         return download_links
 
     def _download_all_data(self):
-        # Define the download directory
         Kaya2018_path = self.path
 
-        # Ensure the directory exists
         os.makedirs(Kaya2018_path, exist_ok=True)
         
-        # Fetch all dataset URLs from the collection page with pagination
         dataset_urls = self._get_all_dataset_urls(self.collection_url)
 
         # Collect all file download links from each dataset page
@@ -213,7 +202,6 @@ List of data files in the dataset grouped by recording session participant.
             download_links = self.get_download_links(dataset_url)
             all_file_links.extend(download_links)
 
-        # List of download URLs (assuming `all_file_links` is defined)
         download_links = all_file_links
 
         # Download each file with its original name
@@ -282,7 +270,7 @@ List of data files in the dataset grouped by recording session participant.
             raw = mne.io.read_raw_fif(path, preload=True)
         except FileNotFoundError as e:
             self.log.error(f"Failed to load raw data for subject {subject}: {e}")
-            raw = None  # You may choose to return None or handle it differently
+            raw = None 
         
         return raw
 
@@ -308,11 +296,11 @@ List of data files in the dataset grouped by recording session participant.
                     subject_paths = glob.glob(os.path.join(os.getcwd(), 'data','raw_fif', '3', paradigm, f's{subject}.*_raw.fif'))
                     run_no = len(subject_paths)
                     
-                    if run_no in {1, 2, 3}:  # Check if it's within the expected range
+                    if run_no in {1, 2, 3}:  
                         current_runs = list(range(0, run_no))
                     else:
                         self.log.error(f"Found {len(subject_paths)} files for subject {subject}. Expected 1, 2, or 3 files.")
-                        continue  # Skip this subject if the number of runs is unexpected
+                        continue  
                 data[paradigm][subject] = {}
                 for run in current_runs:
                     raw = self.load_one_raw_fif(subject, run=run, paradigm=paradigm)

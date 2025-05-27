@@ -1,26 +1,20 @@
-import os
+# Part of this software includes code from the "moabb" project, 
+# licensed under the BSD 3-Clause License.
+
 import glob
-import requests
-import mne
-from scipy.io import loadmat
-from mne.channels import make_standard_montage
-from mne import create_info
-import numpy as np
-from mne.io import RawArray
-
-
-from datasets import BaseDataset
-from helper_functions import setup_logger
-
+import os
 from functools import partialmethod
 
 import numpy as np
+import requests
+import mne
 from mne import create_info
 from mne.channels import make_standard_montage
 from mne.io import RawArray
 from scipy.io import loadmat
 
-
+from datasets import BaseDataset
+from helper_functions import setup_logger
 
 Lee2019_URL = "https://s3.ap-northeast-1.wasabisys.com/gigadb-datasets/live/pub/10.5524/100001_101000/100542/"
 
@@ -44,8 +38,7 @@ class Lee2019(BaseDataset):
             interval = [
                 0.0,
                 4.0,
-            ]  # [1.0, 3.5] is the interval used in paper for online prediction
-                # 0.00 - 4.00 buvo įsivaizduojamas griebimas
+            ]  #[1.0, 3.5] is the interval used in paper for online prediction
 
             events = dict(left_hand=2, right_hand=1)
         elif self.paradigm == "ERP":
@@ -144,7 +137,6 @@ class Lee2019(BaseDataset):
         montage = make_standard_montage("standard_1005")
         raw.set_montage(montage)
 
-        # Create EMG channels
         emg_raw = self._make_raw_array(data["EMG"], data["EMG_index"], "emg", sfreq)
 
         # Create stim chan
@@ -163,9 +155,9 @@ class Lee2019(BaseDataset):
             
             events = mne.find_events(raw, stim_channel='STI 014')
             # Convert the events to annotations
-            onsets = events[:, 0] / raw.info['sfreq']  # Convert from sample to seconds
-            durations = np.full(len(events), 4.0)  # Set duration of all events to 4 seconds
-            descriptions = [str(event_id) for event_id in events[:, 2]]  # Event descriptions as string
+            onsets = events[:, 0] / raw.info['sfreq']  
+            durations = np.full(len(events), 4.0)  
+            descriptions = [str(event_id) for event_id in events[:, 2]]  
 
             # Create annotations from events
             annotations = mne.Annotations(onset=onsets, duration=durations, description=descriptions)
@@ -290,7 +282,7 @@ class Lee2019(BaseDataset):
             raw = mne.io.read_raw_fif(path, preload=True)
         except FileNotFoundError as e:
             self.log.error(f"Failed to load raw data for subject {subject}: {e}")
-            raw = None  # You may choose to return None or handle it differently
+            raw = None 
         
         return raw
 
@@ -317,13 +309,13 @@ class Lee2019(BaseDataset):
                     subject_paths = glob.glob(os.path.join(os.getcwd(), 'data','raw_fif', '20', paradigm, 's{:02}.*_raw.fif').format(subject))
                     run_no = len(subject_paths)
                     
-                    if run_no in {1, 2}:  # Check if it's within the expected range
+                    if run_no in {1, 2}:  
                         current_runs = list(range(1, run_no + 1))
                     else:
                         self.log.error(f"Found {len(subject_paths)} files for subject {subject}. Expected 1 or 2 files.")
-                        continue  # Skip this subject if the number of runs is unexpected
+                        continue 
                 data[paradigm][subject] = {}
-                for run in [current_runs]:
+                for run in current_runs:
                     raw = self.load_one_raw_fif(subject, run=run, paradigm=paradigm)
                     data[paradigm][subject][run] = raw
         return data

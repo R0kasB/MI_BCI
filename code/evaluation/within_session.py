@@ -74,7 +74,6 @@ def train_and_evaluate(epochs, pipelines=None, n_splits=5, pipeline_name='single
                        n_jobs=1, feature_pipelines= None, classifier_pipelines = None, construct_pipelines=False,
                        return_model_filename=False):
     print('=============================================================================')
-    """single pipeline key should only be passed if 1 pipeline is being evaluated #reiktu sutvarkyt, kad ne single pipeline vardas butu o pipeline key"""
     if log is None:
         from helper_functions import setup_logger
         log = setup_logger('pipeline_evaluation')
@@ -85,7 +84,7 @@ def train_and_evaluate(epochs, pipelines=None, n_splits=5, pipeline_name='single
 
     results = {}
     model_filename_list = []
-#patikrint ar nekelia erroru copy=False, su raw meta
+    #patikrint ar nekelia erroru copy=False, su raw meta
     X = epochs_train.get_data(copy=False)
    
     y = epochs_train.events[:, -1] - 1
@@ -95,7 +94,6 @@ def train_and_evaluate(epochs, pipelines=None, n_splits=5, pipeline_name='single
             pipelines = {pipeline_name: pipelines}
 
         for name, pipeline in pipelines.items():
-            # kad nebūtų evaluating pipeline - single pipeline
             if single_pipeline_key:
                 name = single_pipeline_key
             
@@ -280,62 +278,10 @@ def train_and_evaluate(epochs, pipelines=None, n_splits=5, pipeline_name='single
                 
         except Exception as e:
             log.error(f"An error occurred in pipeline (1st try) {name}: {e}")
-            results[name] = None # taip geriau tikriausiai
+            results[name] = None 
             #results[name] = {'error': str(e)}
-# sukurt temporary saving, jei užlužtu kažkas ir nebaigtų visų pipelinų vertint.
+    
+    # sukurt temp saving
     if return_model_filename:
         return results, model_filename_list
     return results
-
-
-'''
-#manual
-def train_and_evaluate(train, pipelines, n_splits=5):
-    results = {}
-
-    for name, pipeline in pipelines.items():
-        print(f"Evaluating pipeline: {name}")
-        try:
-            sgk = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=529)
-
-            X, y, groups = get_X_y(train)
-
-            fold = 0
-            aucs = []
-            accs = []
-            for train_idx, val_idx in sgk.split(X, y, groups):
-                X_tr = X.loc[train_idx]
-                y_tr = y.loc[train_idx]
-                
-                X_val = X.loc[val_idx]
-                y_val = y.loc[val_idx]
-
-                # Fit Model on Train
-                clf = pipeline
-                clf.fit(X_tr, y_tr)
-                pred = clf.predict(X_val)
-                pred_prob = clf.predict_proba(X_val)[:, 1]
-                acc_score = accuracy_score(y_val, pred)
-                auc_score = roc_auc_score(y_val, pred_prob)
-
-                print(f"======= Fold {fold} ========")
-                print(
-                    f"Our accuracy on the validation set is {acc_score:0.4f} and AUC is {auc_score:0.4f}"
-                )
-                fold += 1
-                aucs.append(auc_score)
-                accs.append(acc_score)
-            auc = np.array(aucs)
-            acc = np.array(accs)
-            print(f'Our out of fold AUC score is {auc:0.4f}')
-            print(f'Our out of fold ACC score is {acc:0.4f}')
-
-            print(f"Scores: {acc}")
-            print(f"Mean accuracy: {np.mean(acc):.4f}")
-            results[name] = auc, acc 
-        except Exception as e:
-            print(f"An error occurred in pipeline {name}: {e}")
-            results[name] = None
-    return results
-    
-'''

@@ -122,7 +122,7 @@ def cs_evaluate(epochs: dict,pipelines=None,n_splits=5,pipeline_name='single_pip
                 'mean_test_accuracy': test_accuracy,
                 'mean_test_auc':      test_roc_auc,
 
-                # === new per-epoch entries ===
+                # === per-epoch entries ===
                 'correct_mask':     correct_mask,# numpy bool array
                 'correct_indices':  np.where(correct_mask)[0].tolist(),
                 'incorrect_indices': np.where(~correct_mask)[0].tolist(),

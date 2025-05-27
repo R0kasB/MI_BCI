@@ -52,19 +52,6 @@ class ARTransformer(BaseEstimator, TransformerMixin):
                 ar_features[i, j * self.order:(j + 1) * self.order] = ar_coeffs
         return ar_features
     
-# class TimeDomainTransformer(BaseEstimator, TransformerMixin):
-#     """Computes time-domain features like mean, variance, skewness."""
-#     def fit(self, X, y=None):
-#         return self
-#     def transform(self, X):
-#         mean = np.mean(X, axis=2)
-#         mean_amplitude = np.mean(np.abs(X), axis=2)
-#         var = np.var(X, axis=2)
-#         skewness = np.mean(((X - mean[:, :, np.newaxis]) ** 3), axis=2) / (var ** 1.5)
-#         features = np.concatenate((mean, mean_amplitude , var, skewness), axis=1)
-#         return features
-
-
 class TimeDomainTransformer(BaseEstimator, TransformerMixin):
     """
     Computes time-domain features for each channel:
@@ -348,36 +335,35 @@ class BandpassFilter(BaseEstimator, TransformerMixin):
         filtered = [mne.filter.filter_data(trial, self.sfreq, self.l_freq,
                                              self.h_freq, verbose=False) for trial in X]
         return np.array(filtered)
-
-
+    
 class CSSPTransformer(BaseEstimator, TransformerMixin):
-    """
-    A placeholder implementation for CSSP (Common Spatio-Spectral Patterns).
-    Here we simply bandpass filter the data and then use a CSP transformer.
-    Adjust the algorithm below according to your specific CSSP formulation.
-    """
-    def __init__(self, n_components=4, l_freq=8, h_freq=30, sfreq=250):
+    def __init__(self, delays=(0,2,4,6), n_components=4):
+        self.delays = delays
         self.n_components = n_components
-        self.l_freq = l_freq
-        self.h_freq = h_freq
-        self.sfreq = sfreq
-        self.cssp_ = None
+
+    def _embed(self, X):
+        n_trials, n_ch, n_times = X.shape
+        L = len(self.delays)
+        X_aug = np.zeros((n_trials, n_ch*L, n_times))
+        for i, trial in enumerate(X):
+            mats = []
+            for d in self.delays:
+                pad = np.pad(trial, ((0,0),(d,0)), mode='constant')[:, :n_times]
+                mats.append(pad)
+            X_aug[i] = np.vstack(mats)
+        return X_aug
 
     def fit(self, X, y):
-        # Apply bandpass filtering to each trial
-        X_filt = [mne.filter.filter_data(trial, self.sfreq, self.l_freq,
-                                           self.h_freq, verbose=False) for trial in X]
-        X_filt = np.array(X_filt)
-        # Fit a CSP instance on the filtered data
-        self.cssp_ = CSP(n_components=self.n_components, log=True) #dėl cleaned reikia , reg=0.1
-        self.cssp_.fit(X_filt, y)
+        X = np.array(X)  # shape (n_trials, n_ch, n_times)
+        X_aug = self._embed(X)
+        self.csp_ = CSP(n_components=self.n_components, log=True)
+        self.csp_.fit(X_aug, y)
         return self
 
     def transform(self, X):
-        X_filt = [mne.filter.filter_data(trial, self.sfreq, self.l_freq,
-                                           self.h_freq, verbose=False) for trial in X]
-        X_filt = np.array(X_filt)
-        return self.cssp_.transform(X_filt)
+        X = np.array(X)
+        X_aug = self._embed(X)
+        return self.csp_.transform(X_aug)
 
 
 class BSSFOTransformer(BaseEstimator, TransformerMixin):

@@ -1,13 +1,12 @@
 import os
-import logging
-from urllib.parse import  urljoin
+import mne
+from mne import Annotations
+from mne.io import RawArray
+from scipy.io import loadmat
+
 from datasets import BaseDataset
 from helper_functions import download_file, setup_logger
 
-import mne
-from scipy.io import loadmat
-from mne import Annotations
-from mne.io import RawArray
 
 class BCI4_1(BaseDataset):
     '''Class to load the BCI Competition IV dataset 1'''
@@ -79,13 +78,6 @@ class BCI4_1(BaseDataset):
 
         montage = mne.channels.make_dig_montage(ch_pos=electrode_coordinates, coord_frame='head')
         raw.set_montage(montage)
-
-        '''
-        # Assuming `cnt` is your continuous EEG data as a NumPy array
-        data = data.astype(np.float64)  # Convert to double precision (equivalent to MATLAB's double)
-        data = 0.1 * data  # Scale the values to convert them to microvolts
-        #pabandyt scalint veliau
-        '''
         
         try:
             cue_positions = data_loaded['mrk'].pos
@@ -95,7 +87,7 @@ class BCI4_1(BaseDataset):
             return raw  # or handle the missing data appropriately
 
         # Convert sample positions to times (assuming you have the sampling frequency)
-        cue_times = cue_positions / sfreq  # Convert positions to times in seconds
+        cue_times = cue_positions / sfreq  
 
         # Define event descriptions based on cue classes
         descriptions = ['Class 1' if y == -1 else 'Class 2' for y in cue_classes]
@@ -151,12 +143,6 @@ class BCI4_1(BaseDataset):
             self.log.info("All files have been processed.")
         else:
             self.log.error(f"Some files were not processed., Files processed: {files_processed}, Total files: {total_paths}")
-
-
-
-
-
-
 
 
 class BCI4_2a(BaseDataset):

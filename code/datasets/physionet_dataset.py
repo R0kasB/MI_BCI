@@ -1,7 +1,5 @@
-# This software includes code from the "moabb" project, licensed under the BSD 3-Clause License.
-# 
-# Copyright (c) 2017, authors of moabb
-# All rights reserved.
+# Part of this software includes code from the "moabb" project, 
+# licensed under the BSD 3-Clause License.
 
 import mne
 import os

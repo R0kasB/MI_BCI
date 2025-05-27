@@ -1,7 +1,7 @@
 import glob
 import os
-import regex as re
-
+# import regex as re
+import re
 import requests
 from tqdm import tqdm
 import zipfile

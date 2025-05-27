@@ -1,21 +1,19 @@
-# This software includes code from the "moabb" project, licensed under the BSD 3-Clause License.
-# 
-# Copyright (c) 2017, authors of moabb
-# All rights reserved.
+# Part of this software includes code from the "moabb" project, 
+# licensed under the BSD 3-Clause License.
 
 import logging
-
-from datasets import BaseDataset
+import os
 
 import mne
-import numpy as np
-from mne import create_info
+from mne import Annotations, create_info
 from mne.channels import make_standard_montage
 from mne.io import RawArray
+import numpy as np
 from scipy.io import loadmat
-from helper_functions import setup_logger, file_mover, download_file
-from mne import Annotations
-import os 
+
+from datasets import BaseDataset
+from helper_functions import download_file, file_mover, setup_logger
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 log = logging.getLogger(__name__)
@@ -135,7 +133,7 @@ class Cho2017(BaseDataset):
                 raw = self._load_one_raw(subject)
             except OSError as e:
                 self.log.error(f"Failed to load raw data for subject {subject}: {e}")
-                continue  # Skip to the next subject if there's an error
+                continue  
             
             dataset_path = save_raw_to_fif(raw, dataset_no=1, file_name=f"s{subject}", logger=self.log)
 
@@ -150,7 +148,7 @@ class Cho2017(BaseDataset):
             raw = mne.io.read_raw_fif(path, preload=True)
         except FileNotFoundError as e:
             self.log.error(f"Failed to load raw data for subject {subject}: {e}")
-            raw = None  # You may choose to return None or handle it differently
+            raw = None  
         
         return raw
 
