@@ -35,7 +35,8 @@ This repository contains all code, notebooks and results for my Bachelor’s the
 
 ---
 
-## Data used in the analysis / Analizėje naudoti duomenys
+## Data / Duomenys  
+Data used in the analysis / Analizėje naudoti duomenys  
 
 - **Dataset**: Lee et al. (2019) free‐access motor imagery EEG  
 - **Format**: raw MATLAB `.mat` → converted to MNE‐compatible `.fif`  
