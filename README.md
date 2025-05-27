@@ -2,14 +2,15 @@
 
 **Undergraduate Neurobiophysics Thesis**  
 **Vilnius University Life Sciences Center**  
-**Program**: Neurobiophysics study program
+**BSc program**: Neurobiophysics  
 **Author / Autorius**: Rokas Bertašius  
 **Supervisor / Darbo vadovas**: Dr. Aleksandras Voicikas  
 
 **Thesis Title**  
 - **EN**: Evaluation of the impact of EEG data quality and processing strategies on motor imagery classification accuracy.  
-- **LT**: EEG duomenų kokybės ir apdorojimo strategijų poveikio motorinės vaizduotės klasifikavimo tikslumui įvertinimas  
+- **LT**: EEG duomenų kokybės ir apdorojimo strategijų poveikio motorinės vaizduotės klasifikavimo tikslumui įvertinimas   
 
+**Feel free to ask any questions**: [rokasbertasius@gmail.com](mailto:rokasbertasius@gmail.com)  
 ---
 
 ## Table of Contents
@@ -17,19 +18,10 @@
 1. [Project Overview / Projekto apžvalga](#project-overview--projekto-apžvalga)  
 2. [Data / Duomenys](#data--duomenys)  
 3. [Repository Structure / Repozitorijos struktūra](#repository-structure--repozitorijos-struktūra)  
-4. [Environment / Aplinka](#environment--aplinka)  
-5. [Installation / Diegimas](#installation--diegimas)  
-6. [Usage / Naudojimas](#usage--naudojimas)  
-7. [Preprocessing / Išankstinis apdorojimas](#preprocessing--išankstinis-apdorojimas)  
-8. [Feature Extraction / Bruožų išgavimas](#feature-extraction--bruozu-isgavimas)  
-9. [Classification & Evaluation / Klasifikacija ir vertinimas](#classification--evaluation--klasifikacija-ir-vertinimas)  
-10. [Statistical Analysis / Statistinė analizė](#statistical-analysis--statistinė-analizė)  
-11. [Results / Rezultatai](#results--rezultatai)  
-12. [Visualization / Vizualizacija](#visualization--vizualizacija)  
-13. [Contributing / Dalyvavimas](#contributing--dalyvavimas)  
-14. [License / Licencija](#license--licencija)  
-15. [Contact / Kontaktai](#contact--kontaktai)  
-16. [Template Notes / Šablono pastabos](#template-notes--šablono-pastabos)  
+4. [Setup / Paruošimas](#setup--paruošimas)  
+5. [Usage / Naudojimas](#usage--naudojimas)   
+
+
 
 ---
 
@@ -43,15 +35,14 @@ This repository contains all code, notebooks and results for my Bachelor’s the
 
 ---
 
-## Data / Duomenys
+## Data / Duomenys  
+Data used in the analysis / Analizėje naudoti duomenys  
 
 - **Dataset**: Lee et al. (2019) free‐access motor imagery EEG  
 - **Format**: raw MATLAB `.mat` → converted to MNE‐compatible `.fif`  
-- **Recording**: 64 EEG channels, two sessions per subject (recorded on separate days), X trials per class (fill in)  
-- **Classes**: left hand, right hand (specify if more)  
-- **Sampling rate**: 1000 Hz (fill in)  
-
-Place all raw `.mat` files in `data/raw/`; the preprocessing script will convert and save cleaned `.fif` files to `data/processed/`.
+- **Recording**: 64 EEG channels, two sessions per subject (recorded on separate days), 100 trials per class 
+- **Classes**: left hand, right hand 
+- **Sampling rate**: 1000 Hz
 
 ---
 
@@ -59,26 +50,61 @@ Place all raw `.mat` files in `data/raw/`; the preprocessing script will convert
 
 ```plain
 MI_BCI/
-├── data/
-│   ├── raw/               # original .mat files
-│   └── processed/         # band-pass filtered & artifact-cleaned .fif
-├── code/                  # all Python scripts
-│   ├── preprocessing.py   # band-pass/notch + wavelet artifact removal + epoch rejection
-│   ├── features_csp.py
-│   ├── features_fbcsp.py
-│   ├── features_cssp.py
-│   ├── features_ts.py
-│   ├── features_logvar.py
-│   ├── classify.py        # train & test classifiers
-│   └── utils.py           # helper functions
-├── notebooks/             # exploratory analysis & figure generation
-│   ├── 01_preprocessing.ipynb
-│   ├── 02_feature_extraction.ipynb
-│   ├── 03_classification.ipynb
-│   └── 04_stats_analysis.ipynb
-├── results/
-│   ├── figures/           # .png/.svg plots
-│   ├── tables/            # .csv summaries & stats outputs
-│   └── models/            # saved model `.pkl` files
-├── requirements.txt       # pip-installable dependencies
+├── code
+│      ├── datasets
+│      │      └── *.py
+│      ├── evaluation
+│      │      └── *.py
+│      ├── helper_functions
+│      │      ├── eda
+│      │      │      └── *.py
+│      │      ├── data_processing
+│      │      │      └── *.py
+│      │      └── *.py
+│      ├── notebooks
+│      │       └── tutorials
+│      │                └── *.ipynb
+│      └── pipelines
+│               └── *.py
+├── plots
+│      └── *.png
+├── pixi.lock
+├── pixi.toml
 └── README.md              # this file
+```
+---
+
+## Setup / Paruošimas
+
+All dependencies and Python settings are declared in the [`pixi.toml`](pixi.toml) file.  
+For more on Pixi, see [https://prefix.dev/](https://prefix.dev/).  
+
+To recreate the exact environment:
+
+```bash
+# 1. Install the Pixi CLI (if you haven't already)
+curl -fsSL https://pixi.sh/install.sh | sh   # macOS/Linux
+# or PowerShell:
+powershell -ExecutionPolicy ByPass -c "irm -useb https://pixi.sh/install.ps1 | iex"
+
+# 2. Change into the directory containing pixi.toml
+cd /path/to/MI_BCI
+
+# 3. Install all dependencies from pixi.toml
+pixi install
+
+# 4. Activate the virtual environment
+pixi shell
+
+# VS Code may not auto-detect the Pixi venv. Select the Pixi interpreter manually.  
+```
+---
+
+## Usage / Naudojimas
+ 
+To run the tutorial notebooks and explore the workflows:
+
+1. Open a terminal and change into the tutorials folder:  
+   ```bash
+   cd code/notebooks/tutorials
+
