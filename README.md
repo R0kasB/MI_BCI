@@ -95,6 +95,8 @@ pixi install
 
 # 4. Activate the virtual environment
 pixi shell
+
+# VS Code may not auto-detect the Pixi venv. Select the Pixi interpreter manually.  
 ```
 ---
 
